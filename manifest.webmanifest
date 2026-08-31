@@ -1,0 +1,16 @@
+{
+  "name": "MBTI Blind Test 情境式盲测",
+  "short_name": "MBTI 盲测",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f6fb",
+  "theme_color": "#f7f7fb",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
