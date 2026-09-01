@@ -1,9 +1,8 @@
 (() => {
   const Q = window.MBTI_QUESTIONS;
-  const VERSION = "3.0";
-  const ACTIVE_PROFILE_KEY = "mbti_blind_active_profile_v3";
-  const SESSION_PREFIX = "mbti_blind_session_v3::";
-  const HISTORY_PREFIX = "mbti_blind_history_v3::";
+  const VERSION = "2.0";
+  const SESSION_KEY = "mbti_blind_session_v2";
+  const HISTORY_KEY = "mbti_blind_history_v2";
   const AXES = [
     {key:"EI", left:"E", right:"I", label:"能量取向", leftName:"外向 E", rightName:"内向 I"},
     {key:"SN", left:"S", right:"N", label:"信息取向", leftName:"实感 S", rightName:"直觉 N"},
@@ -23,27 +22,12 @@
 
   const $ = s => document.querySelector(s);
   const views = ["#welcomeView","#testView","#resultView","#historyView"];
-  let profile = loadSessionProfile();
-  let session = profile ? load(profileSessionKey(), null) : null;
-  let index = session?.current || 0;
+  let session = load(SESSION_KEY, null);
+  let index = 0;
   let autoTimer = null;
 
   function load(key, fallback){ try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
   function save(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
-  function loadSessionProfile(){ try { return JSON.parse(sessionStorage.getItem(ACTIVE_PROFILE_KEY)) || null; } catch { return null; } }
-  function saveSessionProfile(){
-    if(profile) sessionStorage.setItem(ACTIVE_PROFILE_KEY, JSON.stringify(profile));
-    else sessionStorage.removeItem(ACTIVE_PROFILE_KEY);
-  }
-  function normalizeNickname(value){
-    return value.normalize ? value.normalize("NFKC").trim().replace(/\s+/g," ").toLocaleLowerCase() : value.trim().replace(/\s+/g," ").toLocaleLowerCase();
-  }
-  function cleanNickname(value){ return value.trim().replace(/\s+/g," "); }
-  function profileIdFor(name){ return encodeURIComponent(normalizeNickname(name)); }
-  function profileSessionKey(){ return SESSION_PREFIX + profile.id; }
-  function profileHistoryKey(){ return HISTORY_PREFIX + profile.id; }
-  function hasProfile(){ return !!(profile && profile.id && profile.nickname); }
-
   function shuffled(arr){
     const a=[...arr];
     if (window.crypto && window.crypto.getRandomValues) {
@@ -59,10 +43,7 @@
   }
   function createSession(){
     return {
-      version:VERSION,
-      respondent:profile.nickname,
-      respondentId:profile.id,
-      startedAt:new Date().toISOString(),
+      version:VERSION, startedAt:new Date().toISOString(),
       items: shuffled(Q.map(q => ({id:q.id, flipped:randomBool()}))),
       answers:{}, current:0
     };
@@ -70,9 +51,7 @@
   function showView(id){
     views.forEach(v=>$(v).classList.toggle("hidden", v!==id));
     $("#homeBtn").classList.toggle("hidden", id==="#welcomeView");
-    $("#historyBtn").classList.toggle("hidden", !hasProfile() || id==="#historyView");
-    $("#profileBtn").classList.toggle("hidden", !hasProfile());
-    if(hasProfile()) $("#profileBtn").textContent=`@${profile.nickname}`;
+    $("#historyBtn").classList.toggle("hidden", id==="#historyView");
     window.scrollTo({top:0,behavior:"auto"});
   }
   function getQuestion(item){
@@ -81,74 +60,33 @@
     return { ...q, a:q.b, b:q.a, aPole:q.bPole, bPole:q.aPole };
   }
   function countAnswered(){ return session ? Object.keys(session.answers).length : 0; }
-
-  function setNickname(raw){
-    const nickname=cleanNickname(raw);
-    const error=$("#nicknameError");
-    if(!nickname){
-      error.textContent="请先填写一个昵称。"; error.classList.remove("hidden"); return false;
-    }
-    if(nickname.length>24){
-      error.textContent="昵称最多 24 个字符。"; error.classList.remove("hidden"); return false;
-    }
-    error.classList.add("hidden");
-    profile={id:profileIdFor(nickname),nickname};
-    saveSessionProfile();
-    session=load(profileSessionKey(),null);
-    index=session?.current || 0;
-    renderWelcome();
-    return true;
-  }
-  function switchProfile(){
-    clearTimeout(autoTimer);
-    profile=null; session=null; index=0; saveSessionProfile();
-    $("#nicknameInput").value="";
-    renderWelcome(); showView("#welcomeView");
-    setTimeout(()=>$("#nicknameInput").focus(),50);
-  }
   function renderWelcome(){
-    const active=hasProfile();
-    $("#identityGate").classList.toggle("hidden",active);
-    $("#activeIdentity").classList.toggle("hidden",!active);
-    $("#testActions").classList.toggle("hidden",!active);
-    $("#historyBtn").classList.toggle("hidden",!active);
-    $("#profileBtn").classList.toggle("hidden",!active);
-    if(active){
-      $("#activeNickname").textContent=profile.nickname;
-      $("#profileBtn").textContent=`@${profile.nickname}`;
-      session=load(profileSessionKey(),null);
-      $("#resumeBtn").classList.toggle("hidden", !(session && countAnswered()>0 && countAnswered()<Q.length));
-      if(session && session.respondentId!==profile.id){ session=null; localStorage.removeItem(profileSessionKey()); }
-    } else {
-      $("#resumeBtn").classList.add("hidden");
-    }
+    $("#resumeBtn").classList.toggle("hidden", !(session && countAnswered()>0 && countAnswered()<Q.length));
   }
   function renderQuestion(){
-    if(!hasProfile() || !session){ showView("#welcomeView"); renderWelcome(); return; }
     const item=session.items[index], q=getQuestion(item), ans=session.answers[item.id];
-    $("#testNickname").textContent=profile.nickname;
     $("#questionNumber").textContent=`QUESTION ${String(index+1).padStart(2,"0")}`;
     $("#questionPrompt").textContent=q.prompt; $("#optionA").textContent=q.a; $("#optionB").textContent=q.b;
     $("#progressText").textContent=`${index+1} / ${Q.length}`; $("#answeredText").textContent=`已答 ${countAnswered()}`;
     $("#progressBar").style.width=`${countAnswered()/Q.length*100}%`;
     document.querySelectorAll("#answerScale button").forEach(b=>b.classList.toggle("selected", Number(b.dataset.value)===ans));
     $("#prevBtn").disabled=index===0; $("#nextBtn").textContent=index===Q.length-1 ? "检查并完成" : "下一题";
-    session.current=index; save(profileSessionKey(),session);
+    session.current=index; save(SESSION_KEY,session);
   }
   function startNew(){
-    if(!hasProfile()){ $("#nicknameInput").focus(); return; }
-    session=load(profileSessionKey(),null);
     if(session && countAnswered()>0 && countAnswered()<Q.length){
-      if(!confirm(`“${profile.nickname}”有一份未完成的测试。开始新测试会覆盖这份进度，继续吗？`)) return;
+      if(!confirm("当前有未完成的测试。开始新测试会覆盖这次进度，继续吗？")) return;
     }
-    session=createSession(); index=0; save(profileSessionKey(),session); showView("#testView"); renderQuestion();
+    session=createSession(); index=0; save(SESSION_KEY,session); showView("#testView"); renderQuestion();
   }
   function choose(value){
     clearTimeout(autoTimer);
-    const item=session.items[index]; session.answers[item.id]=value; save(profileSessionKey(),session); renderQuestion();
+    const item=session.items[index]; session.answers[item.id]=value; save(SESSION_KEY,session); renderQuestion();
     autoTimer=setTimeout(()=>{ if(index<Q.length-1){ index++; renderQuestion(); } else { finish(); } }, 230);
   }
-  function missingIndex(){ return session.items.findIndex(it => session.answers[it.id] == null); }
+  function missingIndex(){
+    return session.items.findIndex(it => session.answers[it.id] == null);
+  }
 
   function score(){
     const byAxis={EI:[],SN:[],TF:[],JP:[]};
@@ -158,7 +96,7 @@
       if(v===3) neutral++;
       const raw=(v-3)/2;
       const pair=[q.aPole,q.bPole].sort().join("");
-      const key = pair==="EI"?"EI":pair==="NS"?"SN":pair==="FT"?"TF":"JP";
+      let key = pair==="EI"?"EI":pair==="NS"?"SN":pair==="FT"?"TF":"JP";
       const axis=AXES.find(a=>a.key===key);
       const oriented = q.bPole===axis.right ? raw : -raw;
       byAxis[key].push(oriented);
@@ -178,8 +116,8 @@
     const neutralRate=Math.round(neutral/Q.length*100);
     const axisConsistency=Math.round(AXES.reduce((s,a)=>s+axes[a.key].consistency,0)/AXES.length);
     const avgDistance=Math.round(AXES.reduce((s,a)=>s+Math.abs(axes[a.key].mean),0)/AXES.length*100);
-    const quality=Math.round(Math.max(0,Math.min(100,45+avgDistance*.35+axisConsistency*.35-neutralRate*.15)));
-    return {respondent:profile.nickname,respondentId:profile.id,type,axes,neutralRate,axisConsistency,avgDistance,quality,completedAt:new Date().toISOString(),version:VERSION};
+    const quality=Math.round(Math.max(0,Math.min(100, 45 + avgDistance*.35 + axisConsistency*.35 - neutralRate*.15)));
+    return {type,axes,neutralRate,axisConsistency,avgDistance,quality,completedAt:new Date().toISOString(),version:VERSION};
   }
   function strength(mean){
     const x=Math.abs(mean);
@@ -196,15 +134,14 @@
     const missing=missingIndex();
     if(missing!==-1){ index=missing; renderQuestion(); alert("还有未作答的题目，已跳到第一道未答题。"); return; }
     const result=score();
-    const history=load(profileHistoryKey(),[]);
+    const history=load(HISTORY_KEY,[]);
     const previous=history[0] || null;
-    history.unshift(result); save(profileHistoryKey(),history.slice(0,20));
-    localStorage.removeItem(profileSessionKey()); session=null;
+    history.unshift(result); save(HISTORY_KEY,history.slice(0,20));
+    localStorage.removeItem(SESSION_KEY); session=null;
     renderResult(result,previous); showView("#resultView");
   }
 
   function renderResult(r,prev){
-    $("#resultNickname").textContent=`答题人：${r.respondent || profile.nickname}`;
     $("#typeText").textContent=r.type;
     $("#typeTitle").textContent=TYPE_TEXT[r.type] || "当前四维偏好画像";
     const sorted=AXES.map(a=>r.axes[a.key]).sort((x,y)=>Math.abs(y.mean)-Math.abs(x.mean));
@@ -231,6 +168,7 @@
     if(r.axisConsistency<45) note+=" 多个维度在不同情境中的回答方向变化较大，因此更适合把结果理解为“情境依赖”，而不是稳定标签。";
     if(r.neutralRate<30 && r.axisConsistency>=45) note+=" 回答具有可用的区分度；仍建议隔几个月用新一轮随机题序复测，而不是把一次结果当成固定人格。";
     $("#qualityNote").textContent=note;
+
     $("#profileText").textContent=`${r.type} 在这套测试中表示：${TYPE_TEXT[r.type] || "四条偏好轴的当前组合"}。这里的百分比不是“你有多少人格成分”，而是本次跨情境回答在该维度上更靠近哪一端。`;
     renderCompare(r,prev);
   }
@@ -242,13 +180,11 @@
       const now=r.axes[a.key].rightPct, old=p.axes[a.key].rightPct, d=Math.round((now-old)*10)/10;
       html+=`<div class="change-row"><span>${a.label}：${a.rightName} ${Math.round(old)}% → ${Math.round(now)}%</span><b class="delta ${d>=0?"up":"down"}">${d>0?"+":""}${d}%</b></div>`;
     });
-    html+=`<p class="muted">这里只有同一昵称自己的历史记录。百分比移动比字母是否改变更有信息量。</p>`;
+    html+=`<p class="muted">百分比移动比字母是否改变更有信息量。接近 50% 的维度即使只移动几分，也可能造成类型字母翻转。</p>`;
     $("#compareContent").innerHTML=html;
   }
   function renderHistory(){
-    if(!hasProfile()){ switchProfile(); return; }
-    $("#historyTitle").textContent=`${profile.nickname} 的复测历史`;
-    const h=load(profileHistoryKey(),[]), root=$("#historyList"); root.innerHTML="";
+    const h=load(HISTORY_KEY,[]), root=$("#historyList"); root.innerHTML="";
     $("#emptyHistory").classList.toggle("hidden",h.length!==0);
     h.forEach(r=>{
       const div=document.createElement("div"); div.className="history-item";
@@ -259,19 +195,14 @@
     });
   }
   function resultText(r){
-    const lines=[`答题人：${r.respondent || profile.nickname}`,`MBTI Blind Test v${r.version}：${r.type}`];
+    const lines=[`MBTI Blind Test v${r.version}：${r.type}`];
     AXES.forEach(a=>{const x=r.axes[a.key];lines.push(`${a.leftName} ${Math.round(x.leftPct)}% · ${a.rightName} ${Math.round(x.rightPct)}%（一致性 ${x.consistency}%）`)});
     lines.push(`结果质量 ${r.quality}/100 · 中间答案 ${r.neutralRate}%`);
     return lines.join("\n");
   }
 
-  $("#nicknameForm").onsubmit=e=>{ e.preventDefault(); if(setNickname($("#nicknameInput").value)) $("#startBtn").focus(); };
-  $("#nicknameInput").oninput=()=>$("#nicknameError").classList.add("hidden");
-  $("#switchProfileBtn").onclick=switchProfile;
-  $("#profileBtn").onclick=switchProfile;
-  $("#resultSwitchBtn").onclick=switchProfile;
   $("#startBtn").onclick=startNew;
-  $("#resumeBtn").onclick=()=>{ session=load(profileSessionKey(),null); index=session?.current||0; showView("#testView"); renderQuestion(); };
+  $("#resumeBtn").onclick=()=>{ index=session.current||0; showView("#testView"); renderQuestion(); };
   $("#historyBtn").onclick=()=>{ renderHistory(); showView("#historyView"); };
   $("#homeBtn").onclick=()=>{ renderWelcome(); showView("#welcomeView"); };
   $("#prevBtn").onclick=()=>{ clearTimeout(autoTimer); if(index>0){index--;renderQuestion();} };
@@ -279,14 +210,11 @@
   document.querySelectorAll("#answerScale button").forEach(b=>b.onclick=()=>choose(Number(b.dataset.value)));
   $("#retakeBtn").onclick=()=>{ session=null; startNew(); };
   $("#copyResultBtn").onclick=async()=>{
-    const h=load(profileHistoryKey(),[]); if(!h[0]) return;
+    const h=load(HISTORY_KEY,[]); if(!h[0]) return;
     try{await navigator.clipboard.writeText(resultText(h[0])); $("#copyResultBtn").textContent="已复制"; setTimeout(()=>$("#copyResultBtn").textContent="复制结果",1200)}
     catch{alert(resultText(h[0]))}
   };
-  $("#clearHistoryBtn").onclick=()=>{
-    if(!hasProfile()) return;
-    if(confirm(`确定清空“${profile.nickname}”在当前浏览器保存的全部测试历史吗？`)){ localStorage.removeItem(profileHistoryKey()); renderHistory(); }
-  };
+  $("#clearHistoryBtn").onclick=()=>{ if(confirm("确定清空当前浏览器保存的全部测试历史吗？")){localStorage.removeItem(HISTORY_KEY);renderHistory();} };
 
   renderWelcome(); showView("#welcomeView");
 })();
