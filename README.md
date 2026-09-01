@@ -7,22 +7,32 @@
 - 48 个跨工作、关系、旅行、学习、冲突、决策等情境的问题
 - 每次新测试随机打乱题序，并随机交换 A/B 位置
 - 逐题移动端交互，选择后自动下一题，可返回修改
-- 自动保存未完成进度
+- **答题前填写昵称，并按昵称独立保存答题进度与历史结果**
+- 同一浏览器可由多个答题人使用；不同昵称互不覆盖
+- 每个浏览器标签页使用 `sessionStorage` 记录当前答题人，因此多个标签页可同时用不同昵称作答
 - E/I、S/N、T/F、J/P 四条连续轴评分
 - 维度方向一致性、中间答案比例、结果质量指标
-- 本地保存最多 20 次完成结果，并自动与上一次比较
-- 数据仅存浏览器 `localStorage`，无后端、无追踪脚本
+- 每个昵称本地保存最多 20 次完成结果，并自动与该昵称上一次比较
+- 数据仅存浏览器 `localStorage` / `sessionStorage`，无后端、无追踪脚本
 - 可作为 GitHub Pages 静态站点部署
+
+## 多人答题的存储方式
+
+昵称会先做统一化处理，再作为本地存储命名空间的一部分：
+
+- `mbti_blind_session_v3::<nickname>`：该昵称未完成的答题进度
+- `mbti_blind_history_v3::<nickname>`：该昵称的历史结果
+- `mbti_blind_active_profile_v3`：当前标签页正在使用的昵称（仅 `sessionStorage`）
+
+因此，在同一浏览器同时打开多个标签页时，只要使用不同昵称，各自的答题进度和结果不会混在一起。
+
+需要注意：目前仍是纯静态网页，数据只保存在答题人自己的浏览器中。不同手机/电脑之间不会同步，网站所有者也不会自动收到所有人的结果。如果未来需要“所有答题结果集中汇总到一个后台”，需要再增加数据库/API。
 
 ## GitHub Pages
 
-推荐使用 GitHub Actions 自动部署。仓库内置 `.github/workflows/pages.yml`，首次只需在：
+仓库已使用 GitHub Actions 自动部署 Pages。提交到 `main` 后会自动发布。
 
-`Settings → Pages → Build and deployment → Source`
-
-选择 **GitHub Actions**。之后每次推送到 `main` 都会自动部署。
-
-站点地址：
+线上地址：
 
 `https://oboahs.github.io/mbti-blind-test/`
 
@@ -39,13 +49,3 @@
 系统先将回答转换到统一的四条轴方向，再对每轴 12 题取平均。百分比表示本轮回答在对应偏好轴上的相对位置，不表示“人格成分占比”。
 
 “一致性”衡量同一维度在不同情境中是否持续偏向同一方向；它低并不等于答错，更可能说明该维度具有较强的情境依赖。
-
-## 文件结构
-
-- `index.html`：页面结构
-- `styles.css`：移动端优先样式
-- `questions.js`：48 道题及隐藏计分键
-- `app.js`：随机化、答题状态、评分、历史比较
-- `manifest.webmanifest`：移动端 Web App 元数据
-- `icon.svg`：站点图标
-- `.github/workflows/pages.yml`：GitHub Pages 自动部署
