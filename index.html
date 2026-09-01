@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f7f7fb">
-  <meta name="description" content="48题情境式 MBTI 盲测：随机题序与选项位置、连续四维评分、复测历史对比。">
+  <meta name="description" content="48题情境式 MBTI 盲测：按昵称独立保存进度与结果，支持多人同时作答。">
   <title>MBTI Blind Test · 情境式盲测</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -15,7 +15,10 @@
     <header class="topbar">
       <button id="homeBtn" class="icon-btn hidden" aria-label="返回首页">←</button>
       <div class="brand">MBTI <span>Blind Test</span></div>
-      <button id="historyBtn" class="text-btn">历史</button>
+      <div class="top-actions">
+        <button id="profileBtn" class="profile-btn hidden" title="切换答题人"></button>
+        <button id="historyBtn" class="text-btn hidden">历史</button>
+      </div>
     </header>
 
     <main>
@@ -24,15 +27,39 @@
           <div class="eyebrow">48 题 · 情境式 · 非官方</div>
           <h1>减少“我知道这题在测什么”的影响</h1>
           <p class="lead">题序和 A/B 位置会在每次新测试时随机变化。请按最近 2～3 个月真实、自然、无需刻意努力的自己作答。</p>
+
+          <div id="identityGate" class="identity-panel">
+            <div class="identity-icon">☺</div>
+            <div>
+              <h2>开始前，请先填写昵称</h2>
+              <p>昵称只用来区分不同答题人。不同昵称的答题进度和结果会分开保存，不会互相覆盖。</p>
+            </div>
+            <form id="nicknameForm" class="nickname-form">
+              <input id="nicknameInput" type="text" maxlength="24" autocomplete="off" enterkeyhint="done" placeholder="例如：小陈、Alex、测试者1" aria-label="昵称">
+              <button class="primary-btn nickname-submit" type="submit">使用这个昵称</button>
+            </form>
+            <div id="nicknameError" class="field-error hidden"></div>
+          </div>
+
+          <div id="activeIdentity" class="active-identity hidden">
+            <div>
+              <span>当前答题人</span>
+              <b id="activeNickname"></b>
+            </div>
+            <button id="switchProfileBtn" class="small-btn" type="button">切换昵称</button>
+          </div>
+
           <div class="feature-grid">
             <div class="feature"><b>盲测</b><span>测试前不显示维度</span></div>
             <div class="feature"><b>连续评分</b><span>不只给四个字母</span></div>
-            <div class="feature"><b>一致性</b><span>识别情境依赖与摇摆</span></div>
-            <div class="feature"><b>复测对比</b><span>观察真实变化轨迹</span></div>
+            <div class="feature"><b>独立进度</b><span>按昵称分开保存</span></div>
+            <div class="feature"><b>复测对比</b><span>同一昵称比较变化</span></div>
           </div>
-          <div class="notice">答案与历史结果只保存在当前浏览器的本地存储中，不上传服务器。</div>
-          <button id="startBtn" class="primary-btn">开始新测试</button>
-          <button id="resumeBtn" class="secondary-btn hidden">继续上次未完成测试</button>
+          <div class="notice">昵称、答案与历史结果只保存在当前浏览器的本地存储中，不会上传到服务器。不同设备之间不会自动同步。</div>
+          <div id="testActions" class="hidden">
+            <button id="startBtn" class="primary-btn">开始新测试</button>
+            <button id="resumeBtn" class="secondary-btn hidden">继续上次未完成测试</button>
+          </div>
         </div>
         <div class="info-card">
           <h2>怎样答更准确？</h2>
@@ -44,6 +71,7 @@
       </section>
 
       <section id="testView" class="view hidden">
+        <div class="respondent-strip">正在作答：<b id="testNickname"></b></div>
         <div class="progress-wrap">
           <div class="progress-meta"><span id="progressText">1 / 48</span><span id="answeredText">已答 0</span></div>
           <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
@@ -65,12 +93,13 @@
             <button id="nextBtn" class="secondary-btn compact">下一题</button>
           </div>
         </article>
-        <p class="microcopy">选择后会自动进入下一题。你可以随时返回修改，进度会自动保存。</p>
+        <p class="microcopy">选择后会自动进入下一题。你可以随时返回修改，进度会保存到当前昵称下。</p>
       </section>
 
       <section id="resultView" class="view hidden">
         <div class="result-hero">
           <div class="eyebrow">CURRENT PROFILE</div>
+          <div id="resultNickname" class="result-nickname"></div>
           <div id="typeText" class="type-text">INFP</div>
           <h1 id="typeTitle"></h1>
           <p id="resultIntro" class="lead"></p>
@@ -84,7 +113,7 @@
         </div>
 
         <div id="compareCard" class="analysis-card hidden">
-          <h2>与上一次相比</h2>
+          <h2>与这个昵称上一次的结果相比</h2>
           <div id="compareContent"></div>
         </div>
 
@@ -96,21 +125,22 @@
 
         <div class="result-actions">
           <button id="copyResultBtn" class="primary-btn">复制结果</button>
-          <button id="retakeBtn" class="secondary-btn">重新测试</button>
+          <button id="retakeBtn" class="secondary-btn">以当前昵称重新测试</button>
+          <button id="resultSwitchBtn" class="secondary-btn">换一个答题人</button>
         </div>
       </section>
 
       <section id="historyView" class="view hidden">
         <div class="section-head">
-          <div><div class="eyebrow">LOCAL HISTORY</div><h1>复测历史</h1></div>
+          <div><div class="eyebrow">LOCAL HISTORY</div><h1 id="historyTitle">复测历史</h1></div>
           <button id="clearHistoryBtn" class="danger-btn">清空历史</button>
         </div>
         <div id="historyList"></div>
-        <div id="emptyHistory" class="empty-state hidden">还没有完成过测试。完成第一次测试后，这里会保存结果。</div>
+        <div id="emptyHistory" class="empty-state hidden">这个昵称还没有完成过测试。完成第一次测试后，这里会保存结果。</div>
       </section>
     </main>
 
-    <footer>MBTI Blind Test v2.0 · 本地运行 · 不收集个人数据</footer>
+    <footer>MBTI Blind Test v3.0 · 按昵称独立保存 · 不收集个人数据</footer>
   </div>
 
   <script src="questions.js"></script>
